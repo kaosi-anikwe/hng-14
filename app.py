@@ -1,7 +1,7 @@
 from flask_cors import CORS
 from flask import Flask, jsonify, request
 
-from functions import classify_name
+from classify import classify_name
 
 app = Flask(__name__)
 CORS(app, origins="*")
