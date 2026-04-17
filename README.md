@@ -1,6 +1,6 @@
 # Name Classifier API
 
-A Flask REST API that classifies a name by gender, age, and nationality by aggregating data from [Genderize.io](https://genderize.io), [Agify.io](https://agify.io), and [Nationalize.io](https://nationalize.io). Profiles are persisted to a local SQLite database.
+A Flask REST API that classifies a name by gender, age, and nationality by aggregating data from [Genderize.io](https://genderize.io), [Agify.io](https://agify.io), and [Nationalize.io](https://nationalize.io). Profiles are persisted to a database — SQLite locally, or [Turso (LibSQL)](https://turso.tech) in production.
 
 ## Endpoints
 
@@ -147,6 +147,20 @@ Deletes a profile by its ID.
 
 ---
 
+## Database
+
+The app selects its database based on environment variables at startup:
+
+- **Locally** — if `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are not set, it uses SQLite (`profile.db` in the project root).
+- **Production** — if both env vars are present, it connects to a [Turso](https://turso.tech) LibSQL database.
+
+Add these to a `.env` file for production use locally:
+
+```
+TURSO_DATABASE_URL=libsql://<your-db>.turso.io
+TURSO_AUTH_TOKEN=<your-token>
+```
+
 ## Running Locally
 
 **Prerequisites:** Python 3.13+
@@ -190,8 +204,17 @@ curl "http://localhost:5000/api/profiles?country_id=US"
 curl -X DELETE http://localhost:5000/api/profiles/<id>
 ```
 
+## Deploying to Vercel
+
+1. Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as environment variables in your Vercel project settings.
+2. Set the install command to:
+   ```
+   pip install -r requirements-prod.txt
+   ```
+   `requirements-prod.txt` extends `requirements.txt` with `libsql-experimental`, which provides the LibSQL SQLAlchemy driver (Linux only — not required for local development on Windows/macOS).
+
 ## Tech Stack
 
 - **Python 3.13+** — Flask, Flask-CORS, Flask-SQLAlchemy, SQLAlchemy
-- **Database** — SQLite (via `instance/profile.db`)
+- **Database** — SQLite (local) / Turso LibSQL (production)
 - **External APIs** — Genderize.io, Agify.io, Nationalize.io

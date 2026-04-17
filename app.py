@@ -1,3 +1,4 @@
+import os
 from flask_cors import CORS
 from flask import Flask, jsonify, request
 
@@ -6,7 +7,16 @@ from utils import genderize, agify, nationalize
 
 app = Flask(__name__)
 CORS(app, origins="*")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///profile.db"
+
+_turso_url = os.environ.get("TURSO_DATABASE_URL", "")
+_turso_token = os.environ.get("TURSO_AUTH_TOKEN", "")
+
+if _turso_url and _turso_token:
+    _host = _turso_url.removeprefix("libsql://")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"libsql+sqld://{_host}?authToken={_turso_token}"
+else:
+    _db_path = os.path.join(os.path.dirname(__file__), "profile.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{_db_path}"
 
 db.init_app(app)
 
