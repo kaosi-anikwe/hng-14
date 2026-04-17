@@ -8,17 +8,10 @@ from utils import genderize, agify, nationalize
 app = Flask(__name__)
 CORS(app, origins="*")
 
-_turso_url = os.environ.get("TURSO_DATABASE_URL", "")
-_turso_token = os.environ.get("TURSO_AUTH_TOKEN", "")
+_database_url = os.environ.get("DATABASE_URL", "")
 
-if _turso_url and _turso_token:
-    import libsql_experimental as libsql
-
-    def _libsql_creator():
-        return libsql.connect(database="", sync_url=_turso_url, auth_token=_turso_token)
-
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite+pysqlite://"
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"creator": _libsql_creator}
+if _database_url:
+    app.config["SQLALCHEMY_DATABASE_URI"] = _database_url
 else:
     _db_path = os.path.join(os.path.dirname(__file__), "profile.db")
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{_db_path}"
