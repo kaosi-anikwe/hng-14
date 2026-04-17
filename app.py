@@ -59,6 +59,7 @@ def profiles():
         try:
             country_id = request.args.get("country_id")
             age_group = request.args.get("age_group")
+            gender = request.args.get("gender")
 
             query = db.session.query(Profile)
 
@@ -66,6 +67,8 @@ def profiles():
                 query = query.filter(Profile.country_id == country_id)
             if age_group:
                 query = query.filter(Profile.age_group == age_group)
+            if gender:
+                query = query.filter(Profile.gender == Gender(gender.lower()))
 
             all_profiles = query.all()
 
