@@ -12,8 +12,13 @@ _turso_url = os.environ.get("TURSO_DATABASE_URL", "")
 _turso_token = os.environ.get("TURSO_AUTH_TOKEN", "")
 
 if _turso_url and _turso_token:
-    _host = _turso_url.removeprefix("libsql://")
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"libsql+sqld://{_host}?authToken={_turso_token}"
+    import libsql_experimental as libsql
+
+    def _libsql_creator():
+        return libsql.connect(database="", sync_url=_turso_url, auth_token=_turso_token)
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite+pysqlite://"
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"creator": _libsql_creator}
 else:
     _db_path = os.path.join(os.path.dirname(__file__), "profile.db")
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{_db_path}"
