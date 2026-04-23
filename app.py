@@ -18,17 +18,19 @@ logger.setLevel(logging.DEBUG)
 _stream_handler = logging.StreamHandler()
 _stream_handler.setLevel(logging.DEBUG)
 
-_file_handler = RotatingFileHandler("app.log", maxBytes=1 * 1024 * 1024, backupCount=5)
-_file_handler.setLevel(logging.DEBUG)
-
 _formatter = logging.Formatter(
     "%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
 _stream_handler.setFormatter(_formatter)
-_file_handler.setFormatter(_formatter)
-
 logger.addHandler(_stream_handler)
-logger.addHandler(_file_handler)
+
+if os.environ.get("LOG_FILE"):
+    _file_handler = RotatingFileHandler(
+        os.environ["LOG_FILE"], maxBytes=1 * 1024 * 1024, backupCount=5
+    )
+    _file_handler.setLevel(logging.DEBUG)
+    _file_handler.setFormatter(_formatter)
+    logger.addHandler(_file_handler)
 # ---------------------
 
 app = Flask(__name__)
