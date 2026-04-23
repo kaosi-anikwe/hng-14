@@ -97,7 +97,7 @@ def profiles():
             )  # age | created_at | gender_probability
             order = request.args.get("order", "asc")  # asc | desc
             page = max(1, int(request.args.get("page", 1)))
-            per_page = max(1, min(50, int(request.args.get("per_page", 10))))
+            per_page = max(1, min(50, int(request.args.get("limit", 10))))
 
             if sort_by not in [
                 "age",
@@ -143,7 +143,6 @@ def profiles():
                 {
                     "status": "success",
                     "page": pagination.page,
-                    "per_page": pagination.per_page,
                     "limit": pagination.per_page,
                     "total": pagination.total,
                     "data": [
@@ -234,7 +233,7 @@ def search_profile():
     )  # age | created_at | gender_probability
     order = request.args.get("order", "asc")  # asc | desc
     page = max(1, int(request.args.get("page", 1)))
-    per_page = max(1, min(50, int(request.args.get("per_page", 10))))
+    per_page = max(1, min(50, int(request.args.get("limit", 10))))
 
     if not search_query:
         return jsonify({"status": "error", "message": "Search query is required"}), 400
@@ -331,7 +330,7 @@ def search_profile():
         {
             "status": "success",
             "page": pagination.page,
-            "per_page": pagination.per_page,
+            "limit": pagination.per_page,
             "total": pagination.total,
             "data": [
                 profile.to_json() for profile in cast(List[Profile], pagination.items)
