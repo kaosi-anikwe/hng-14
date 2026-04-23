@@ -11,7 +11,7 @@ from sqlalchemy import Integer, Float, String, Text, Enum, DateTime
 def _uuid7_hex() -> str:
     if not hasattr(uuid, "uuid7"):
         raise RuntimeError(
-            "uuid7 requires Python 3.13+. Current version: " + sys.version
+            "uuid7 requires Python 3.14+. Current version: " + sys.version
         )
     return uuid.uuid7().hex
 
@@ -35,10 +35,10 @@ class Profile(Base):
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     gender: Mapped[Gender] = mapped_column(Enum(Gender), nullable=False)
     gender_probability: Mapped[float] = mapped_column(Float, nullable=False)
-    sample_size: Mapped[int] = mapped_column(Integer, nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     age_group: Mapped[str] = mapped_column(Text, nullable=False)
-    country_id: Mapped[str] = mapped_column(Text, nullable=False)
+    country_id: Mapped[str] = mapped_column(String(2), nullable=False)
+    country_name: Mapped[str] = mapped_column(Text, nullable=False)
     country_probability: Mapped[float] = mapped_column(Float, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -52,10 +52,10 @@ class Profile(Base):
             "name": self.name,
             "gender": self.gender.value,
             "gender_probability": self.gender_probability,
-            "sample_size": self.sample_size,
             "age": self.age,
             "age_group": self.age_group,
             "country_id": self.country_id,
+            "country_name": self.country_name,
             "country_probability": self.country_probability,
             "created_at": self.created_at.isoformat(),
         }

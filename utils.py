@@ -1,12 +1,35 @@
+import os
+import json
+import logging
+from typing import Optional, List
+
 import requests
-from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
+type ProfileData = dict[str, str | int | float]
+
 
 def genderize(name: str) -> dict[str, str | bool | dict]:
+    """Predicts the gender of a name using the Genderize.io API.
+
+    Args:
+        name: The first name to classify.
+
+    Returns:
+        A dict with a ``success`` key. On success, ``data`` contains:
+            - ``gender`` (str): ``"male"`` or ``"female"``.
+            - ``gender_probability`` (float): Confidence score between 0 and 1.
+            - ``sample_size`` (int): Number of data points used for the prediction.
+        On failure, ``message`` describes the reason.
+
+    Raises:
+        Exception: If the API returns an unparseable or unexpected response.
+    """
     url = "https://api.genderize.io"
 
     if not name:
@@ -45,6 +68,21 @@ def genderize(name: str) -> dict[str, str | bool | dict]:
 
 
 def agify(name: str) -> dict[str, str | bool | dict]:
+    """Predicts the age associated with a name using the Agify.io API.
+
+    Args:
+        name: The first name to classify.
+
+    Returns:
+        A dict with a ``success`` key. On success, ``data`` contains:
+            - ``age`` (int): Predicted age in years.
+            - ``age_group`` (str): One of ``"child"`` (≤12), ``"teenager"`` (13–20),
+              ``"adult"`` (21–59), or ``"senior"`` (60+).
+        On failure, ``message`` describes the reason.
+
+    Raises:
+        Exception: If the API returns an unparseable or unexpected response.
+    """
     url = "https://api.agify.io"
 
     if not name:
@@ -79,6 +117,22 @@ def agify(name: str) -> dict[str, str | bool | dict]:
 
 
 def nationalize(name: str) -> dict[str, str | bool | dict]:
+    """Predicts the most likely nationality for a name using the Nationalize.io API.
+
+    Returns the highest-probability country from the API response.
+
+    Args:
+        name: The first name to classify.
+
+    Returns:
+        A dict with a ``success`` key. On success, ``data`` contains:
+            - ``country_id`` (str): ISO 3166-1 alpha-2 country code (e.g. ``"US"``).
+            - ``country_probability`` (float): Confidence score between 0 and 1.
+        On failure, ``message`` describes the reason.
+
+    Raises:
+        Exception: If the API returns an unparseable or unexpected response.
+    """
     url = "https://api.nationalize.io"
 
     if not name:
@@ -111,3 +165,55 @@ def nationalize(name: str) -> dict[str, str | bool | dict]:
         }
     except:
         raise Exception("Nationalize returned an invalid response")
+
+
+def seed_profiles(json_file: Optional[str], fresh: bool = False) -> None:
+    """Seeds the database with profile data from a JSON file.
+    Call within a Flask-app context.
+
+    Args:
+        json_file: Path to a JSON file containing profile records to insert.
+            If ``None``, the function does nothing.
+        fresh (bool): If ``True``, database is cleared.
+    """
+    if json_file and os.path.exists(json_file):
+        from models import db, Profile, Gender
+
+        if db.session.query(Profile).first() and not fresh:
+            logger.info("Profile data already exists, use fresh to clear database.")
+            return
+
+        with open(json_file, "r") as f:
+            json_data: dict[str, List[ProfileData]] = json.load(f)
+            profile_data = json_data.get("profiles", [])
+            profiles: List[Profile] = []
+
+            for profile in profile_data:
+                new_profile: Profile = Profile(
+                    name=profile.get("name"),
+                    gender=Gender(str(profile.get("gender")).lower()),
+                    gender_probability=profile.get("gender_probability"),
+                    age=profile.get("age"),
+                    age_group=profile.get("age_group"),
+                    country_id=profile.get("country_id"),
+                    country_name=profile.get("country_name"),
+                    country_probability=profile.get("country_probability"),
+                )
+                profiles.append(new_profile)
+                logger.debug(f"Created profile with name: {new_profile.name}")
+
+            try:
+                if fresh:
+                    logger.debug("Clearing existing database")
+                    db.drop_all()
+
+                db.create_all()
+
+                logger.info(f"Adding {len(profiles)} to database")
+                db.session.add_all(profiles)
+                db.session.commit()
+            except:
+                db.session.rollback()
+                raise Exception("Failed to add profiles to database.")
+
+    logger.info(f"JSON file: {json_file} not found.")
