@@ -8,7 +8,6 @@ from sqlalchemy import asc, desc, select, and_, or_
 from app.models import db, Profile, Gender
 from app.utils import genderize, agify, nationalize
 
-
 logger = logging.getLogger(__name__)
 routes = Blueprint("profiles", __name__)
 
@@ -209,11 +208,11 @@ def search_profile():
     female_match = re.search(r"\bfemales?\b", search_query, re.IGNORECASE)
 
     if male_match and not female_match:
-        query = query.where(Profile.gender == Gender.male)
+        query = query.where(Profile.gender == Gender.MALE)
         filters_applied = True
         logger.info("Search filter applied: gender=male")
     elif female_match and not male_match:
-        query = query.where(Profile.gender == Gender.female)
+        query = query.where(Profile.gender == Gender.FEMALE)
         filters_applied = True
         logger.info("Search filter applied: gender=female")
     elif male_match and female_match:
@@ -316,4 +315,3 @@ def profile(id: str):
         db.session.commit()
 
         return "", 204
-

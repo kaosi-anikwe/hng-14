@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, Float, String, Text, Enum, DateTime
+from sqlalchemy import Integer, Float, String, Text, Enum, DateTime, Boolean
 
 
 def _uuid7_hex() -> str:
@@ -24,13 +24,18 @@ db = SQLAlchemy(model_class=Base)
 
 
 class Gender(enum.Enum):
-    male = "male"
-    female = "female"
+    MALE = "male"
+    FEMALE = "female"
+
+
+class Role(enum.Enum):
+    ADMIN = "admin"
+    ANALYST = "analyst"
 
 
 class Profile(Base):
-    __tablename__ = "profile"
-
+    __tablename__ = "profiles"
+    
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid7_hex)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     gender: Mapped[Gender] = mapped_column(Enum(Gender), nullable=False)
@@ -70,3 +75,23 @@ class Profile(Base):
             "country_id": self.country_id,
             "created_at": self.created_at.isoformat(),
         }
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid7_hex)
+    github_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String)
+    avatar_url: Mapped[str] = mapped_column(String)
+    role: Mapped[Role] = mapped_column(Enum(Role), nullable=False, default=Role.ANALYST)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_login_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )

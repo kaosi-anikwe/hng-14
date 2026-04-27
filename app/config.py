@@ -1,7 +1,10 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class AppConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     SQLALCHEMY_DATABASE_URI: str = "sqlite:///profile.db"
 
@@ -14,5 +17,4 @@ class AppConfig(BaseSettings):
     GITHUB_CLIENT_SECRET: str
 
 
-
-settings = AppConfig() # type: ignore
+settings = AppConfig()  # type: ignore

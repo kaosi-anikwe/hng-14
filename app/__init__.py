@@ -30,6 +30,7 @@ if settings.LOG_FILE:
     logger.addHandler(_file_handler)
 # ---------------------
 
+
 def create_app() -> Flask:
     app = Flask(__name__)
 
