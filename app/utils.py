@@ -239,7 +239,7 @@ def admin_required():
             # Check the property on the loaded user object
             # current_user is populated by your user_lookup_loader
             user: User | None = current_user
-            if not user or not user.role != Role.ADMIN:
+            if not user or user.role != Role.ADMIN:
                 return (
                     jsonify({"status": "error", "message": "Admin access required"}),
                     403,

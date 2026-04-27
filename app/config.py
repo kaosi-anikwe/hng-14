@@ -16,7 +16,7 @@ class AppConfig(BaseSettings):
     JWT_SECRET_KEY: str
     JWT_ACCESS_TOKEN_EXPIRES: timedelta = timedelta(minutes=3)
     JWT_REFRESH_TOKEN_EXPIRES: timedelta = timedelta(minutes=5)
-    JWT_COOKIE_CSRF_PROTECT: bool = True
+    JWT_COOKIE_CSRF_PROTECT: bool = False
     JWT_TOKEN_LOCATION: List[str] = ["cookies"]
 
     # Logging

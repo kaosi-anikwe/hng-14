@@ -86,8 +86,6 @@ def github_callback():
         token_response_data: dict[str, str] = token_response.json()
         oauth_token = token_response_data.get("access_token", "")
 
-        logger.info(f"OAUTH TOKEN: {oauth_token}")
-
         # 4. Retrieve user data with access token
         user_url = "https://api.github.com/user"
         user_headers = {"Authorization": f"Bearer {oauth_token}"}
@@ -110,8 +108,6 @@ def github_callback():
             email = primary_email[0] if primary_email else None
             if not email:
                 return jsonify({"status": "error", "message": "No email found"})
-
-        logger.info(f"{username, github_id, avatar_url, email}")
 
         user: User | None = None
 

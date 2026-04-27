@@ -1,10 +1,15 @@
 import re
+import io
+import csv
 import logging
 from typing import cast, List
+from datetime import datetime, timezone
+
+import pycountry
 
 from flask_jwt_extended import jwt_required
-from flask import jsonify, request, Blueprint
 from sqlalchemy import asc, desc, select, and_, or_
+from flask import jsonify, request, Blueprint, url_for, Response
 
 from app.models import db, Profile, Gender
 from app.utils import genderize, agify, nationalize, version_required, admin_required
@@ -51,7 +56,7 @@ def classify():
 
 
 @routes.get("/profiles")
-@jwt_required()
+@admin_required()
 def get_profiles():
     try:
         gender = request.args.get("gender")
@@ -102,12 +107,47 @@ def get_profiles():
 
         pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
 
+        active_filters = {
+            k: v for k, v in request.args.items() if k not in ("page", "limit")
+        }
+
         return jsonify(
             {
                 "status": "success",
                 "page": pagination.page,
                 "limit": pagination.per_page,
                 "total": pagination.total,
+                "links": {
+                    "self": url_for(
+                        "profiles.get_profiles",
+                        page=pagination.page,
+                        limit=pagination.per_page,
+                        _external=False,
+                        **active_filters,
+                    ),
+                    "next": (
+                        url_for(
+                            "profiles.get_profiles",
+                            page=pagination.next_num,
+                            limit=pagination.per_page,
+                            _external=False,
+                            **active_filters,
+                        )
+                        if pagination.next_num
+                        else None
+                    ),
+                    "prev": (
+                        url_for(
+                            "profiles.get_profiles",
+                            page=pagination.prev_num,
+                            limit=pagination.per_page,
+                            _external=False,
+                            **active_filters,
+                        )
+                        if pagination.prev_num
+                        else None
+                    ),
+                },
                 "data": [
                     profile.to_json()
                     for profile in cast(List[Profile], pagination.items)
@@ -163,6 +203,8 @@ def create_profile():
             age_group = str(age_result.get("age_group", ""))
             country_id = str(country_result.get("country_id", ""))
             country_probability = float(country_result.get("country_probability", 0))
+            _country = pycountry.countries.get(alpha_2=country_id)
+            country_name = _country.name if _country else ""
 
             new_profile = Profile(
                 name=name,
@@ -171,6 +213,7 @@ def create_profile():
                 age=age,
                 age_group=age_group,
                 country_id=country_id,
+                country_name=country_name,
                 country_probability=round(country_probability, 2),
             )
 
@@ -291,12 +334,47 @@ def search_profile():
 
     pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
 
+    active_filters = {
+        k: v for k, v in request.args.items() if k not in ("page", "limit")
+    }
+
     return jsonify(
         {
             "status": "success",
             "page": pagination.page,
             "limit": pagination.per_page,
             "total": pagination.total,
+            "links": {
+                "self": url_for(
+                    "profiles.search_profile",
+                    page=pagination.page,
+                    limit=pagination.per_page,
+                    _external=False,
+                    **active_filters,
+                ),
+                "next": (
+                    url_for(
+                        "profiles.search_profile",
+                        page=pagination.next_num,
+                        limit=pagination.per_page,
+                        _external=False,
+                        **active_filters,
+                    )
+                    if pagination.next_num
+                    else None
+                ),
+                "prev": (
+                    url_for(
+                        "profiles.search_profile",
+                        page=pagination.prev_num,
+                        limit=pagination.per_page,
+                        _external=False,
+                        **active_filters,
+                    )
+                    if pagination.prev_num
+                    else None
+                ),
+            },
             "data": [
                 profile.to_json() for profile in cast(List[Profile], pagination.items)
             ],
@@ -304,7 +382,7 @@ def search_profile():
     )
 
 
-@routes.route("/profiles/<string:id>", methods=["GET", "DELETE"])
+@routes.get("/profiles/<string:id>")
 @jwt_required()
 def profile(id: str):
     profile: Profile | None = db.session.get(Profile, id)
@@ -312,10 +390,108 @@ def profile(id: str):
     if not profile:
         return jsonify({"status": "error", "message": "profile not found"}), 404
 
-    if request.method == "GET":
-        return jsonify({"status": "success", "data": profile.to_json()})
-    else:  # method = DELETE
-        db.session.delete(profile)
-        db.session.commit()
+    return jsonify({"status": "success", "data": profile.to_json()})
 
-        return "", 204
+
+@routes.delete("/profiles/<string:id>")
+@admin_required()
+def delete_profile(id: str):
+    profile: Profile | None = db.session.get(Profile, id)
+
+    if not profile:
+        return jsonify({"status": "error", "message": "profile not found"}), 404
+
+    db.session.delete(profile)
+    db.session.commit()
+
+    return "", 204
+
+
+@routes.get("/profiles/export")
+@admin_required()
+def export_profiles():
+    try:
+        export_format = request.args.get("format")
+
+        if not export_format or export_format != "csv":
+            return jsonify({"status": "error", "message": "Invalid export format"}), 400
+
+        gender = request.args.get("gender")
+        age_group = request.args.get("age_group")
+        country_id = request.args.get("country_id")
+        min_age = request.args.get("min_age")
+        max_age = request.args.get("max_age")
+        min_gender_probability = request.args.get("min_gender_probability")
+        min_country_probability = request.args.get("min_country_probability")
+        sort_by = request.args.get(
+            "sort_by", "age"
+        )  # age | created_at | gender_probability
+        order = request.args.get("order", "asc")  # asc | desc
+
+        if sort_by not in [
+            "age",
+            "created_at",
+            "gender_probability",
+        ] or order not in ["asc", "desc"]:
+            return (
+                jsonify({"status": "error", "message": "Invalid query parameters"}),
+                400,
+            )
+
+        query = select(Profile)
+
+        if gender:
+            query = query.where(Profile.gender == Gender(gender.lower()))
+        if age_group:
+            query = query.where(Profile.age_group == age_group)
+        if country_id:
+            query = query.where(Profile.country_id == country_id)
+        if min_age:
+            query = query.where(Profile.age >= min_age)
+        if max_age:
+            query = query.where(Profile.age <= max_age)
+        if min_gender_probability:
+            query = query.where(Profile.gender_probability >= min_gender_probability)
+        if min_country_probability:
+            query = query.where(Profile.country_probability >= min_country_probability)
+
+        sort_param = getattr(Profile, sort_by)
+        order_fn = asc if order == "asc" else desc
+
+        query = query.order_by(order_fn(sort_param))
+
+        profiles: List[Profile] = list(db.session.execute(query).scalars().all())
+
+        output = io.StringIO()
+        writer = csv.DictWriter(
+            output,
+            fieldnames=[
+                "id",
+                "name",
+                "gender",
+                "gender_probability",
+                "age",
+                "age_group",
+                "country_id",
+                "country_name",
+                "country_probability",
+                "created_at",
+            ],
+        )
+        writer.writeheader()
+        for p in profiles:
+            writer.writerow(p.to_json())
+
+        output.seek(0)
+        timestamp = datetime.now(timezone.utc).timestamp()
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=profiles_{timestamp}.csv"
+            },
+        )
+
+    except Exception as e:
+        logger.error(str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
