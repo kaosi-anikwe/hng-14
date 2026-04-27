@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,6 +8,10 @@ class AppConfig(BaseSettings):
     )
 
     SQLALCHEMY_DATABASE_URI: str = "sqlite:///profile.db"
+    SECRET_KEY: str
+    JWT_SECRET_KEY: str
+    JWT_ACCESS_TOKEN_EXPIRES: timedelta = timedelta(minutes=3)
+    JWT_REFRESH_TOKEN_EXPIRES: timedelta = timedelta(minutes=5)
 
     # Logging
     DEBUG: bool = True
@@ -15,6 +20,7 @@ class AppConfig(BaseSettings):
     # GitHub OAuth
     GITHUB_CLIENT_ID: str
     GITHUB_CLIENT_SECRET: str
+    REDIRECT_URI: str
 
 
 settings = AppConfig()  # type: ignore

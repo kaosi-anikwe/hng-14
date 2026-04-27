@@ -9,7 +9,7 @@ from app.models import db, Profile, Gender
 from app.utils import genderize, agify, nationalize
 
 logger = logging.getLogger(__name__)
-routes = Blueprint("profiles", __name__)
+routes = Blueprint("profiles", __name__, url_prefix="/api")
 
 
 @routes.get("/")
@@ -17,8 +17,7 @@ def index():
     return jsonify({"message": "Hello"})
 
 
-@routes.get("/api")
-@routes.get("/api/classify")
+@routes.get("/classify")
 def classify():
     try:
         params = request.args
@@ -43,7 +42,7 @@ def classify():
         return jsonify({"status": "error", "message": "failed to classify name"}), 500
 
 
-@routes.route("/api/profiles", methods=["GET", "POST"])
+@routes.route("/profiles", methods=["GET", "POST"])
 def profiles():
     if request.method == "GET":
         try:
@@ -187,7 +186,7 @@ def profiles():
             return jsonify({"status": "error", "message": str(e)}), 502
 
 
-@routes.get("/api/profiles/search")
+@routes.get("/profiles/search")
 def search_profile():
     search_query = request.args.get("q", "").strip()
     sort_by = request.args.get(
@@ -301,7 +300,7 @@ def search_profile():
     )
 
 
-@routes.route("/api/profiles/<string:id>", methods=["GET", "DELETE"])
+@routes.route("/profiles/<string:id>", methods=["GET", "DELETE"])
 def profile(id: str):
     profile: Profile | None = db.session.get(Profile, id)
 

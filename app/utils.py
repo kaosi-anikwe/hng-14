@@ -1,5 +1,8 @@
 import os
 import json
+import base64
+import hashlib
+import secrets
 import logging
 from typing import Optional, List
 
@@ -208,8 +211,15 @@ def seed_profiles(json_file: Optional[str], fresh: bool = False) -> None:
                 logger.info(f"Adding {len(profiles)} to database")
                 db.session.add_all(profiles)
                 db.session.commit()
-            except:
+            except Exception as e:
                 db.session.rollback()
-                raise Exception("Failed to add profiles to database.")
+                raise Exception(f"Failed to add profiles to database: {str(e)}")
 
     logger.info(f"JSON file: {json_file} not found.")
+
+
+def generate_pkce():
+    verifier = secrets.token_urlsafe(64)
+    sha256_hash = hashlib.sha256(verifier.encode("utf-8")).digest()
+    challenge = base64.urlsafe_b64encode(sha256_hash).decode("utf-8").rstrip("=")
+    return verifier, challenge

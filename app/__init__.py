@@ -1,6 +1,8 @@
 import logging
+
 from flask import Flask
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from logging.handlers import RotatingFileHandler
 
 from app.models import db
@@ -36,6 +38,7 @@ def create_app() -> Flask:
 
     app.config.from_mapping(settings.model_dump())
     CORS(app, origins="*")
+    JWTManager(app)
 
     db.init_app(app)
 

@@ -35,10 +35,12 @@ class Role(enum.Enum):
 
 class Profile(Base):
     __tablename__ = "profiles"
-    
+
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid7_hex)
     name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    gender: Mapped[Gender] = mapped_column(Enum(Gender), nullable=False)
+    gender: Mapped[Gender] = mapped_column(
+        Enum(Gender, values_callable=lambda obj: [e.value for e in obj]), nullable=False
+    )
     gender_probability: Mapped[float] = mapped_column(Float, nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     age_group: Mapped[str] = mapped_column(Text, nullable=False)
@@ -95,3 +97,8 @@ class User(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+    def login_now(self):
+        """Set last login to ``now`` and is active to ``True`` without committing"""
+        self.is_active = True
+        self.last_login_at = datetime.now(timezone.utc)
