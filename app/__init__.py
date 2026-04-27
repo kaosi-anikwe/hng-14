@@ -1,5 +1,6 @@
 import logging
 
+import redis
 from flask_cors import CORS
 from flask import Flask, jsonify
 from flask_jwt_extended import JWTManager
@@ -33,6 +34,18 @@ if settings.LOG_FILE:
 # ---------------------
 
 
+# --- Redis client ---
+jwt_redis_blocklist = redis.Redis(
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    username=settings.REDIS_USERNAME,
+    password=settings.REDIS_PASSWORD,
+    db=0,
+    decode_responses=True,
+)
+# ---------------------
+
+
 # --- JWT setup ---
 jwt = JWTManager()
 
@@ -53,11 +66,23 @@ def invalid_token(error: str):
 
 
 @jwt.user_lookup_loader
-def user_lookup_callback(_jwt_header, jwt_data: dict[str, str]):
+def user_lookup_callback(jwt_header, jwt_data: dict[str, str]):
     # identity is typically stored in the 'sub' (subject) claim
     user_id = jwt_data["sub"]
     # Query your database
     return db.session.get(User, user_id)
+
+
+@jwt.token_in_blocklist_loader
+def check_if_token_is_revoked(jwt_header, jwt_payload):
+    jti = jwt_payload["jti"]
+    token_in_redis = jwt_redis_blocklist.get(f"blacklist:{jti}")
+    return token_in_redis is not None  # Returns True if revoked
+
+
+@jwt.revoked_token_loader
+def revoked_token_callback(jwt_header, jwt_payload):
+    return jsonify({"status": "error", "message": "Token has been revoked"}), 401
 
 
 # ---------------------

@@ -1,12 +1,17 @@
 import logging
 import secrets
 from typing import List
+from datetime import datetime, timezone
 
 import requests
 from requests import Request
 from sqlalchemy.exc import IntegrityError
 from flask import Blueprint, redirect, jsonify, session, request
 from flask_jwt_extended import (
+    get_jwt,
+    jwt_required,
+    get_current_user,
+    get_jwt_identity,
     create_access_token,
     create_refresh_token,
     set_access_cookies,
@@ -16,6 +21,7 @@ from flask_jwt_extended import (
 
 from app.config import settings
 from app.models import db, User
+from app import jwt_redis_blocklist
 from app.utils import generate_pkce
 
 logger = logging.getLogger(__name__)
@@ -158,12 +164,69 @@ def github_callback():
 
 
 @routes.post("/refresh")
+@jwt_required(refresh=True, locations=["json"])
 def refresh():
-    return jsonify()
+    try:
+        identity = get_jwt_identity()
+
+        # Get the JTI of the current refresh token to blocklist it
+        jwt_payload = get_jwt()
+        jti = jwt_payload["jti"]
+
+        # Calculate remaining life to set Redis TTL
+        exp = jwt_payload["exp"]
+        now = datetime.now(timezone.utc).timestamp()
+        ttl = int(exp - now)
+
+        # Add to Redis blocklist
+        if ttl > 0:
+            jwt_redis_blocklist.setex(f"blacklist:{jti}", ttl, "revoked")
+
+        # Generate brand new tokens
+        new_access_token = create_access_token(identity=identity)
+        new_refresh_token = create_refresh_token(identity=identity)
+
+        return jsonify(
+            {
+                "status": "success",
+                "access_token": new_access_token,
+                "refresh_token": new_refresh_token,
+            }
+        )
+
+    except Exception as e:
+        logger.error(str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @routes.post("/logout")
+@jwt_required(verify_type=False)
 def logout():
-    response = jsonify()
-    unset_jwt_cookies(response)
-    return response
+    try:
+        jwt_data = get_jwt()
+        jti = jwt_data["jti"]
+
+        # Calculate how much longer the token is valid (in seconds)
+        # This is the TTL for the Redis entry
+        exp = jwt_data["exp"]
+        now = datetime.now(timezone.utc).timestamp()
+        ttl = int(exp - now)
+
+        # Store JTI in Redis with calculated TTL
+        if ttl > 0:
+            jwt_redis_blocklist.setex(f"blacklist:{jti}", ttl, "revoked")
+
+        user: User | None = get_current_user()
+        if user:
+            user.is_active = False
+            db.session.commit()
+
+        # Clear the cookies
+        response = jsonify({"status": "success"})
+        unset_jwt_cookies(response)
+
+        return response
+    except Exception as e:
+        db.session.rollback()
+        logger.error(str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
