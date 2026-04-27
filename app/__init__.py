@@ -1,11 +1,11 @@
 import logging
 
-from flask import Flask
 from flask_cors import CORS
+from flask import Flask, jsonify
 from flask_jwt_extended import JWTManager
 from logging.handlers import RotatingFileHandler
 
-from app.models import db
+from app.models import db, User
 from app.config import settings
 
 # --- Logging setup ---
@@ -33,14 +33,44 @@ if settings.LOG_FILE:
 # ---------------------
 
 
+# --- JWT setup ---
+jwt = JWTManager()
+
+
+@jwt.expired_token_loader
+def expired_token(jwt_header, jwt_paylod):
+    return jsonify({"status": "error", "message": "Your session has expired"}), 401
+
+
+@jwt.unauthorized_loader
+def unauthorized(error: str):
+    return jsonify({"status": "error", "message": error}), 401
+
+
+@jwt.invalid_token_loader
+def invalid_token(error: str):
+    return jsonify({"status": "error", "message": error}), 422
+
+
+@jwt.user_lookup_loader
+def user_lookup_callback(_jwt_header, jwt_data: dict[str, str]):
+    # identity is typically stored in the 'sub' (subject) claim
+    user_id = jwt_data["sub"]
+    # Query your database
+    return db.session.get(User, user_id)
+
+
+# ---------------------
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
 
     app.config.from_mapping(settings.model_dump())
     CORS(app, origins="*")
-    JWTManager(app)
 
     db.init_app(app)
+    jwt.init_app(app)
 
     from app.routes.auth import routes as auth_bp
     from app.routes.profile import routes as profile_bp

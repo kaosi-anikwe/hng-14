@@ -6,7 +6,13 @@ import requests
 from requests import Request
 from sqlalchemy.exc import IntegrityError
 from flask import Blueprint, redirect, jsonify, session, request
-from flask_jwt_extended import create_access_token, create_refresh_token
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    set_access_cookies,
+    set_refresh_cookies,
+    unset_jwt_cookies,
+)
 
 from app.config import settings
 from app.models import db, User
@@ -56,7 +62,7 @@ def github_callback():
         if not code_verifier:
             return "Missing code verifier", 400
 
-        # 3. Exchange for Access Token
+        # 3. Exchange for OAuth Token
         token_url = "https://github.com/login/oauth/access_token"
         token_payload = {
             "client_id": settings.GITHUB_CLIENT_ID,
@@ -101,6 +107,8 @@ def github_callback():
 
         logger.info(f"{username, github_id, avatar_url, email}")
 
+        user: User | None = None
+
         # 5. Create or update user login time
         existing_user: User | None = (
             db.session.query(User).filter(User.github_id == github_id).first()
@@ -108,45 +116,41 @@ def github_callback():
         if existing_user:
             existing_user.login_now()
             db.session.commit()
-
-            access_token = create_access_token(identity=existing_user.id)
-            refresh_token = create_refresh_token(identity=existing_user.id)
-            return jsonify(
-                {
-                    "status": "success",
-                    "access_token": access_token,
-                    "refresh_token": refresh_token,
-                }
+            user = existing_user
+        else:
+            new_user: User = User(
+                github_id=github_id,
+                username=username,
+                email=email,
+                avatar_url=avatar_url,
             )
+            new_user.login_now()
+            db.session.add(new_user)
 
-        new_user: User = User(
-            github_id=github_id,
-            username=username,
-            email=email,
-            avatar_url=avatar_url,
-        )
-        new_user.login_now()
-        db.session.add(new_user)
+            try:
+                db.session.commit()
+                db.session.refresh(new_user)
+                user = new_user
+            except IntegrityError:
+                db.session.rollback()
+                return (
+                    jsonify({"status": "error", "message": "Email already registered"}),
+                    429,
+                )
 
-        try:
-            db.session.commit()
-            db.session.refresh(new_user)
-        except IntegrityError:
-            db.session.rollback()
-            return (
-                jsonify({"status": "error", "message": "Email already registered"}),
-                429,
-            )
-
-        access_token = create_access_token(identity=new_user.id)
-        refresh_token = create_refresh_token(identity=new_user.id)
-        return jsonify(
+        # 6. Issue access and refresh token
+        access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
+        response = jsonify(
             {
                 "status": "success",
                 "access_token": access_token,
                 "refresh_token": refresh_token,
             }
         )
+        set_access_cookies(response, access_token)
+        set_refresh_cookies(response, refresh_token)
+        return response
     except Exception as e:
         db.session.rollback()
         logger.error(str(e))
@@ -160,4 +164,6 @@ def refresh():
 
 @routes.post("/logout")
 def logout():
-    return jsonify()
+    response = jsonify()
+    unset_jwt_cookies(response)
+    return response

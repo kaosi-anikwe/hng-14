@@ -4,9 +4,14 @@ import base64
 import hashlib
 import secrets
 import logging
+from functools import wraps
 from typing import Optional, List
 
 import requests
+from flask import jsonify, request
+from flask_jwt_extended import verify_jwt_in_request, current_user
+
+from app.models import User, Role
 
 logger = logging.getLogger(__name__)
 
@@ -223,3 +228,49 @@ def generate_pkce():
     sha256_hash = hashlib.sha256(verifier.encode("utf-8")).digest()
     challenge = base64.urlsafe_b64encode(sha256_hash).decode("utf-8").rstrip("=")
     return verifier, challenge
+
+
+def admin_required():
+    def wrapper(fn):
+        @wraps(fn)
+        def decorator(*args, **kwargs):
+            # Verify JWT exists and is valid
+            verify_jwt_in_request()
+            # Check the property on the loaded user object
+            # current_user is populated by your user_lookup_loader
+            user: User | None = current_user
+            if not user or not user.role != Role.ADMIN:
+                return (
+                    jsonify({"status": "error", "message": "Admin access required"}),
+                    403,
+                )
+
+            return fn(*args, **kwargs)
+
+        return decorator
+
+    return wrapper
+
+
+def version_required():
+    def wrapper(fn):
+        @wraps(fn)
+        def decorator(*args, **kwargs):
+            header_value = request.headers.get("X-API-Version")
+
+            if not header_value:
+                return (
+                    jsonify(
+                        {"status": "error", "message": "API version header required"}
+                    ),
+                    400,
+                )
+
+            if header_value != "1":
+                return jsonify({"error": "Invalid header value"}), 401
+
+            return fn(*args, **kwargs)
+
+        return decorator
+
+    return wrapper

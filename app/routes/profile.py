@@ -2,14 +2,21 @@ import re
 import logging
 from typing import cast, List
 
+from flask_jwt_extended import jwt_required
 from flask import jsonify, request, Blueprint
 from sqlalchemy import asc, desc, select, and_, or_
 
 from app.models import db, Profile, Gender
-from app.utils import genderize, agify, nationalize
+from app.utils import genderize, agify, nationalize, version_required, admin_required
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("profiles", __name__, url_prefix="/api")
+
+
+@routes.before_request
+@version_required()
+def protect_blueprint():
+    pass
 
 
 @routes.get("/")
@@ -18,6 +25,7 @@ def index():
 
 
 @routes.get("/classify")
+@jwt_required()
 def classify():
     try:
         params = request.args
@@ -42,151 +50,147 @@ def classify():
         return jsonify({"status": "error", "message": "failed to classify name"}), 500
 
 
-@routes.route("/profiles", methods=["GET", "POST"])
-def profiles():
-    if request.method == "GET":
-        try:
-            gender = request.args.get("gender")
-            age_group = request.args.get("age_group")
-            country_id = request.args.get("country_id")
-            min_age = request.args.get("min_age")
-            max_age = request.args.get("max_age")
-            min_gender_probability = request.args.get("min_gender_probability")
-            min_country_probability = request.args.get("min_country_probability")
-            sort_by = request.args.get(
-                "sort_by", "age"
-            )  # age | created_at | gender_probability
-            order = request.args.get("order", "asc")  # asc | desc
-            page = max(1, int(request.args.get("page", 1)))
-            per_page = max(1, min(50, int(request.args.get("limit", 10))))
+@routes.get("/profiles")
+@jwt_required()
+def get_profiles():
+    try:
+        gender = request.args.get("gender")
+        age_group = request.args.get("age_group")
+        country_id = request.args.get("country_id")
+        min_age = request.args.get("min_age")
+        max_age = request.args.get("max_age")
+        min_gender_probability = request.args.get("min_gender_probability")
+        min_country_probability = request.args.get("min_country_probability")
+        sort_by = request.args.get(
+            "sort_by", "age"
+        )  # age | created_at | gender_probability
+        order = request.args.get("order", "asc")  # asc | desc
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = max(1, min(50, int(request.args.get("limit", 10))))
 
-            if sort_by not in [
-                "age",
-                "created_at",
-                "gender_probability",
-            ] or order not in ["asc", "desc"]:
-                return (
-                    jsonify({"status": "error", "message": "Invalid query parameters"}),
-                    400,
-                )
-
-            query = select(Profile)
-
-            if gender:
-                query = query.where(Profile.gender == Gender(gender.lower()))
-            if age_group:
-                query = query.where(Profile.age_group == age_group)
-            if country_id:
-                query = query.where(Profile.country_id == country_id)
-            if min_age:
-                query = query.where(Profile.age >= min_age)
-            if max_age:
-                query = query.where(Profile.age <= max_age)
-            if min_gender_probability:
-                query = query.where(
-                    Profile.gender_probability >= min_gender_probability
-                )
-            if min_country_probability:
-                query = query.where(
-                    Profile.country_probability >= min_country_probability
-                )
-
-            sort_param = getattr(Profile, sort_by)
-            order_fn = asc if order == "asc" else desc
-
-            query = query.order_by(order_fn(sort_param))
-
-            pagination = db.paginate(
-                query, page=page, per_page=per_page, error_out=False
+        if sort_by not in [
+            "age",
+            "created_at",
+            "gender_probability",
+        ] or order not in ["asc", "desc"]:
+            return (
+                jsonify({"status": "error", "message": "Invalid query parameters"}),
+                400,
             )
 
+        query = select(Profile)
+
+        if gender:
+            query = query.where(Profile.gender == Gender(gender.lower()))
+        if age_group:
+            query = query.where(Profile.age_group == age_group)
+        if country_id:
+            query = query.where(Profile.country_id == country_id)
+        if min_age:
+            query = query.where(Profile.age >= min_age)
+        if max_age:
+            query = query.where(Profile.age <= max_age)
+        if min_gender_probability:
+            query = query.where(Profile.gender_probability >= min_gender_probability)
+        if min_country_probability:
+            query = query.where(Profile.country_probability >= min_country_probability)
+
+        sort_param = getattr(Profile, sort_by)
+        order_fn = asc if order == "asc" else desc
+
+        query = query.order_by(order_fn(sort_param))
+
+        pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
+
+        return jsonify(
+            {
+                "status": "success",
+                "page": pagination.page,
+                "limit": pagination.per_page,
+                "total": pagination.total,
+                "data": [
+                    profile.to_json()
+                    for profile in cast(List[Profile], pagination.items)
+                ],
+            }
+        )
+    except:
+        return (
+            jsonify({"status": "error", "message": "Failed to get profiles"}),
+            500,
+        )
+
+
+@routes.post("/profiles")
+@admin_required()
+def create_profile():
+    try:
+        request_data: dict = request.get_json()
+        name: str = str(request_data.get("name", ""))
+
+        if not name:
+            return (
+                jsonify({"status": "error", "message": "name not specified"}),
+                400,
+            )
+
+        existing_profile: Profile | None = (
+            db.session.query(Profile).filter(Profile.name == name).first()
+        )
+
+        if existing_profile:
             return jsonify(
                 {
                     "status": "success",
-                    "page": pagination.page,
-                    "limit": pagination.per_page,
-                    "total": pagination.total,
-                    "data": [
-                        profile.to_json()
-                        for profile in cast(List[Profile], pagination.items)
-                    ],
+                    "message": "Profile already exists",
+                    "data": existing_profile.to_json(),
                 }
             )
-        except:
+
+        # create new profile
+        gender_result = genderize(name).get("data", {})
+        age_result = agify(name).get("data", {})
+        country_result = nationalize(name).get("data", {})
+
+        if (
+            isinstance(gender_result, dict)
+            and isinstance(age_result, dict)
+            and isinstance(country_result, dict)
+        ):
+            gender = str(gender_result.get("gender", "male"))
+            gender_probability = float(gender_result.get("gender_probability", 0))
+            age = int(age_result.get("age", 0))
+            age_group = str(age_result.get("age_group", ""))
+            country_id = str(country_result.get("country_id", ""))
+            country_probability = float(country_result.get("country_probability", 0))
+
+            new_profile = Profile(
+                name=name,
+                gender=Gender(gender.lower()),
+                gender_probability=round(gender_probability, 2),
+                age=age,
+                age_group=age_group,
+                country_id=country_id,
+                country_probability=round(country_probability, 2),
+            )
+
+            db.session.add(new_profile)
+            db.session.commit()
+            db.session.refresh(new_profile)
+
+            return jsonify({"status": "success", "data": new_profile.to_json()})
+        else:
             return (
-                jsonify({"status": "error", "message": "Failed to get profiles"}),
+                jsonify({"status": "error", "message": "Failed to create profile"}),
                 500,
             )
-
-    else:  # method = POST
-        try:
-            request_data: dict = request.get_json()
-            name: str = str(request_data.get("name", ""))
-
-            if not name:
-                return (
-                    jsonify({"status": "error", "message": "name not specified"}),
-                    400,
-                )
-
-            existing_profile: Profile | None = (
-                db.session.query(Profile).filter(Profile.name == name).first()
-            )
-
-            if existing_profile:
-                return jsonify(
-                    {
-                        "status": "success",
-                        "message": "Profile already exists",
-                        "data": existing_profile.to_json(),
-                    }
-                )
-
-            # create new profile
-            gender_result = genderize(name).get("data", {})
-            age_result = agify(name).get("data", {})
-            country_result = nationalize(name).get("data", {})
-
-            if (
-                isinstance(gender_result, dict)
-                and isinstance(age_result, dict)
-                and isinstance(country_result, dict)
-            ):
-                gender = str(gender_result.get("gender", "male"))
-                gender_probability = float(gender_result.get("gender_probability", 0))
-                age = int(age_result.get("age", 0))
-                age_group = str(age_result.get("age_group", ""))
-                country_id = str(country_result.get("country_id", ""))
-                country_probability = float(
-                    country_result.get("country_probability", 0)
-                )
-
-                new_profile = Profile(
-                    name=name,
-                    gender=Gender(gender.lower()),
-                    gender_probability=round(gender_probability, 2),
-                    age=age,
-                    age_group=age_group,
-                    country_id=country_id,
-                    country_probability=round(country_probability, 2),
-                )
-
-                db.session.add(new_profile)
-                db.session.commit()
-                db.session.refresh(new_profile)
-
-                return jsonify({"status": "success", "data": new_profile.to_json()})
-            else:
-                return (
-                    jsonify({"status": "error", "message": "Failed to create profile"}),
-                    500,
-                )
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"status": "error", "message": str(e)}), 502
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @routes.get("/profiles/search")
+@jwt_required()
 def search_profile():
     search_query = request.args.get("q", "").strip()
     sort_by = request.args.get(
@@ -301,6 +305,7 @@ def search_profile():
 
 
 @routes.route("/profiles/<string:id>", methods=["GET", "DELETE"])
+@jwt_required()
 def profile(id: str):
     profile: Profile | None = db.session.get(Profile, id)
 
