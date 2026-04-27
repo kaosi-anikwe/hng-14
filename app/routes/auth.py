@@ -159,6 +159,104 @@ def github_callback():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@routes.post("/cli/callback")
+def cli_callback():
+    try:
+        # 1. Get Code and Verifier
+        callback_data = request.get_json()
+        code = callback_data.get("code")
+        code_verifier = callback_data.get("code_verifier")
+
+        if not code or not code_verifier:
+            return jsonify({"status": "error", "message": "`code` and `code_verifier` is required."}), 400
+        
+        # 2. Exchange for OAuth Token
+        token_url = "https://github.com/login/oauth/access_token"
+        token_payload = {
+            "client_id": settings.GITHUB_CLIENT_ID,
+            "client_secret": settings.GITHUB_CLIENT_SECRET,
+            "code": code,
+            "code_verifier": code_verifier,
+        }
+        token_headers = {"Accept": "application/json"}
+        token_response = requests.post(
+            url=token_url, headers=token_headers, data=token_payload
+        )
+        token_response.raise_for_status()
+
+        token_response_data: dict[str, str] = token_response.json()
+        oauth_token = token_response_data.get("access_token", "")
+
+        # 3. Retrieve user data with access token
+        user_url = "https://api.github.com/user"
+        user_headers = {"Authorization": f"Bearer {oauth_token}"}
+        user_response = requests.get(url=user_url, headers=user_headers)
+        user_response.raise_for_status()
+        user_data: dict[str, str] = user_response.json()
+
+        username = user_data.get("login")
+        github_id = str(user_data.get("id"))
+        avatar_url = user_data.get("avatar_url")
+        email = user_data.get("email")
+
+        if not email:
+            # 3.1 Get User email
+            emails_url = "https://api.github.com/user/emails"
+            emails_response = requests.get(url=emails_url, headers=user_headers)
+            emails_response.raise_for_status()
+            emails: List[dict[str, str]] = emails_response.json()
+            primary_email = [email["email"] for email in emails if email["primary"]]
+            email = primary_email[0] if primary_email else None
+            if not email:
+                return jsonify({"status": "error", "message": "No email found"})
+
+        user: User | None = None
+
+        # 4. Create or update user login time
+        existing_user: User | None = (
+            db.session.query(User).filter(User.github_id == github_id).first()
+        )
+        if existing_user:
+            existing_user.login_now()
+            db.session.commit()
+            user = existing_user
+        else:
+            new_user: User = User(
+                github_id=github_id,
+                username=username,
+                email=email,
+                avatar_url=avatar_url,
+            )
+            new_user.login_now()
+            db.session.add(new_user)
+
+            try:
+                db.session.commit()
+                db.session.refresh(new_user)
+                user = new_user
+            except IntegrityError:
+                db.session.rollback()
+                return (
+                    jsonify({"status": "error", "message": "Email already registered"}),
+                    429,
+                )
+
+        # 5. Issue access and refresh token
+        access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
+        return jsonify(
+            {
+                "status": "success",
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+            }
+        )
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @routes.post("/refresh")
 @jwt_required(refresh=True, locations=["json"])
 def refresh():

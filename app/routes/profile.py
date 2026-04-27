@@ -56,7 +56,7 @@ def classify():
 
 
 @routes.get("/profiles")
-@admin_required()
+@jwt_required()
 def get_profiles():
     try:
         gender = request.args.get("gender")
@@ -111,12 +111,19 @@ def get_profiles():
             k: v for k, v in request.args.items() if k not in ("page", "limit")
         }
 
+        total_pages = (
+            -(-(int(pagination.total) / pagination.per_page) // 1)
+            if pagination.total
+            else 0
+        )
+
         return jsonify(
             {
                 "status": "success",
                 "page": pagination.page,
                 "limit": pagination.per_page,
                 "total": pagination.total,
+                "total_pages": int(total_pages),
                 "links": {
                     "self": url_for(
                         "profiles.get_profiles",
@@ -338,12 +345,19 @@ def search_profile():
         k: v for k, v in request.args.items() if k not in ("page", "limit")
     }
 
+    total_pages = (
+        -(-(int(pagination.total) / pagination.per_page) // 1)
+        if pagination.total
+        else 0
+    )
+
     return jsonify(
         {
             "status": "success",
             "page": pagination.page,
             "limit": pagination.per_page,
             "total": pagination.total,
+            "total_pages": int(total_pages),
             "links": {
                 "self": url_for(
                     "profiles.search_profile",
