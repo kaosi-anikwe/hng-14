@@ -1,62 +1,25 @@
 import re
-import os
 import logging
-from logging.handlers import RotatingFileHandler
 from typing import cast, List
 
-from flask_cors import CORS
-from flask import Flask, jsonify, request
-from sqlalchemy import asc, desc, select, and_, or_, func
+from flask import jsonify, request, Blueprint
+from sqlalchemy import asc, desc, select, and_, or_
 
-from models import db, Profile, Gender
-from utils import genderize, agify, nationalize, seed_profiles
-
-# --- Logging setup ---
-logger = logging.getLogger()  # root logger — all module loggers propagate here
-logger.setLevel(logging.DEBUG)
-
-_stream_handler = logging.StreamHandler()
-_stream_handler.setLevel(logging.DEBUG)
-
-_formatter = logging.Formatter(
-    "%(asctime)s [%(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-)
-_stream_handler.setFormatter(_formatter)
-logger.addHandler(_stream_handler)
-
-if os.environ.get("LOG_FILE"):
-    _file_handler = RotatingFileHandler(
-        os.environ["LOG_FILE"], maxBytes=1 * 1024 * 1024, backupCount=5
-    )
-    _file_handler.setLevel(logging.DEBUG)
-    _file_handler.setFormatter(_formatter)
-    logger.addHandler(_file_handler)
-# ---------------------
-
-app = Flask(__name__)
-CORS(app, origins="*")
-
-_database_url = os.environ.get("DATABASE_URL", "")
-
-if _database_url:
-    app.config["SQLALCHEMY_DATABASE_URI"] = _database_url
-else:
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///profile.db"
-
-db.init_app(app)
-
-with app.app_context():
-    db.create_all()
-    seed_profiles("seed_profiles.json")
+from app.models import db, Profile, Gender
+from app.utils import genderize, agify, nationalize
 
 
-@app.get("/")
+logger = logging.getLogger(__name__)
+routes = Blueprint("profiles", __name__)
+
+
+@routes.get("/")
 def index():
     return jsonify({"message": "Hello"})
 
 
-@app.get("/api")
-@app.get("/api/classify")
+@routes.get("/api")
+@routes.get("/api/classify")
 def classify():
     try:
         params = request.args
@@ -81,7 +44,7 @@ def classify():
         return jsonify({"status": "error", "message": "failed to classify name"}), 500
 
 
-@app.route("/api/profiles", methods=["GET", "POST"])
+@routes.route("/api/profiles", methods=["GET", "POST"])
 def profiles():
     if request.method == "GET":
         try:
@@ -225,7 +188,7 @@ def profiles():
             return jsonify({"status": "error", "message": str(e)}), 502
 
 
-@app.get("/api/profiles/search")
+@routes.get("/api/profiles/search")
 def search_profile():
     search_query = request.args.get("q", "").strip()
     sort_by = request.args.get(
@@ -339,7 +302,7 @@ def search_profile():
     )
 
 
-@app.route("/api/profiles/<string:id>", methods=["GET", "DELETE"])
+@routes.route("/api/profiles/<string:id>", methods=["GET", "DELETE"])
 def profile(id: str):
     profile: Profile | None = db.session.get(Profile, id)
 
@@ -354,6 +317,3 @@ def profile(id: str):
 
         return "", 204
 
-
-if __name__ == "__main__":
-    app.run(debug=True)

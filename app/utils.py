@@ -5,10 +5,6 @@ from typing import Optional, List
 
 import requests
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 logger = logging.getLogger(__name__)
 
 type ProfileData = dict[str, str | int | float]
@@ -177,7 +173,7 @@ def seed_profiles(json_file: Optional[str], fresh: bool = False) -> None:
         fresh (bool): If ``True``, database is cleared.
     """
     if json_file and os.path.exists(json_file):
-        from models import db, Profile, Gender
+        from app.models import db, Profile, Gender
 
         if db.session.query(Profile).first() and not fresh:
             logger.info("Profile data already exists, use fresh to clear database.")
