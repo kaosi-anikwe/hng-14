@@ -266,7 +266,7 @@ def version_required():
                     400,
                 )
 
-            if header_value != "1":
+            if str(header_value) != "1":
                 return jsonify({"error": "Invalid header value"}), 401
 
             return fn(*args, **kwargs)

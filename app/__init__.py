@@ -91,6 +91,9 @@ def revoked_token_callback(jwt_header, jwt_payload):
 def create_app() -> Flask:
     app = Flask(__name__)
 
+    logger.debug("MODEL DUMP")
+    logger.debug(settings.model_dump())
+    
     app.config.from_mapping(settings.model_dump())
     CORS(app, origins="*")
 
