@@ -11,6 +11,7 @@ from flask_jwt_extended import jwt_required
 from sqlalchemy import asc, desc, select, and_, or_
 from flask import jsonify, request, Blueprint, url_for, Response
 
+from app.config import settings
 from app.models import db, Profile, Gender
 from app.utils import genderize, agify, nationalize, version_required, admin_required
 
@@ -26,6 +27,8 @@ def protect_blueprint():
 
 @routes.get("/")
 def index():
+    logger.debug("MODEL DUMP")
+    logger.debug(settings.model_dump())
     return jsonify({"message": "Hello"})
 
 
