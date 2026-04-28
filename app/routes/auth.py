@@ -247,6 +247,7 @@ def cli_callback():
         return jsonify(
             {
                 "status": "success",
+                "username": user.username,
                 "access_token": access_token,
                 "refresh_token": refresh_token,
             }
