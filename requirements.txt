@@ -1,0 +1,10 @@
+flask
+flask-cors
+flask-sqlalchemy
+flask-jwt-extended
+psycopg2-binary
+pydantic-settings
+redis
+requests
+pycountry
+python-dotenv
