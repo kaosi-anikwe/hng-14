@@ -293,9 +293,9 @@ def search_profile():
     below_match = re.search(r"\bbelow\s+(\d{1,3})\b", search_query, re.IGNORECASE)
 
     if above_match:
-        query = query.where(Profile.age >= int(above_match.group(1)))
+        query = query.where(Profile.age > int(above_match.group(1)))
         filters_applied = True
-        logger.info("Search filter applied: age>=%s", above_match.group(1))
+        logger.info("Search filter applied: age>%s", above_match.group(1))
     if below_match:
         query = query.where(Profile.age < int(below_match.group(1)))
         filters_applied = True
