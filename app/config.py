@@ -21,7 +21,7 @@ class AppConfig(BaseSettings):
 
     # Logging
     DEBUG: bool = True
-    LOG_FILE: str
+    LOG_FILE: str = ""
 
     # GitHub OAuth
     GITHUB_CLIENT_ID: str
