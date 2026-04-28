@@ -27,8 +27,8 @@ def protect_blueprint():
 
 @routes.get("/")
 def index():
-    logger.debug("MODEL DUMP")
-    logger.debug(settings.model_dump())
+    logger.info("MODEL DUMP")
+    logger.info(settings.model_dump())
     return jsonify({"message": "Hello"})
 
 
