@@ -2,4 +2,15 @@
 name = "hng-14"
 version = "0.1.0"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "flask",
+    "flask-cors",
+    "flask-sqlalchemy",
+    "flask-jwt-extended",
+    "psycopg2-binary",
+    "pydantic-settings",
+    "redis",
+    "requests",
+    "pycountry",
+    "python-dotenv",
+]
