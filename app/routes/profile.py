@@ -161,7 +161,8 @@ def get_profiles():
                 ],
             }
         )
-    except:
+    except Exception as e:
+        logger.error(f"Failed to get profiles: {str(e)}")
         return (
             jsonify({"status": "error", "message": "Failed to get profiles"}),
             500,
@@ -235,6 +236,7 @@ def create_profile():
                 500,
             )
     except Exception as e:
+        logger.error(f"Failed to create profile: {str(e)}")
         db.session.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
 

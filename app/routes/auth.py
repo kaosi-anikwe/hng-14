@@ -168,8 +168,16 @@ def cli_callback():
         code_verifier = callback_data.get("code_verifier")
 
         if not code or not code_verifier:
-            return jsonify({"status": "error", "message": "`code` and `code_verifier` is required."}), 400
-        
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "message": "`code` and `code_verifier` are required.",
+                    }
+                ),
+                400,
+            )
+
         # 2. Exchange for OAuth Token
         token_url = "https://github.com/login/oauth/access_token"
         token_payload = {
@@ -257,6 +265,7 @@ def cli_callback():
         db.session.rollback()
         logger.error(str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @routes.post("/refresh")
 @jwt_required(refresh=True, locations=["json"])
