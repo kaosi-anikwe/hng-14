@@ -15,6 +15,47 @@ Authentication is handled via **GitHub OAuth** with PKCE. Access and refresh tok
 
 ---
 
+## Rate Limiting
+
+All limits are enforced via **Flask-Limiter** backed by Redis (db `1`).
+
+| Scope                     | Limit           | Key                                                          |
+| ------------------------- | --------------- | ------------------------------------------------------------ |
+| `/auth/*` endpoints       | 10 req / minute | IP address                                                   |
+| All other `/api/*` routes | 60 req / minute | JWT identity (falls back to IP for unauthenticated requests) |
+
+When a limit is exceeded the API returns:
+
+```json
+{
+  "status": "error",
+  "message": "Too many requests. Please slow down."
+}
+```
+
+**HTTP Status:** `429 Too Many Requests`
+
+---
+
+## Request Logging
+
+Every request is logged at `INFO` level in the format:
+
+```
+YYYY-MM-DD HH:MM:SS [INFO] METHOD /path STATUS_CODE ELAPSED_ms
+```
+
+Example:
+
+```
+2026-04-29 12:00:01 [INFO] GET /api/profiles 200 4.3ms
+2026-04-29 12:00:02 [INFO] POST /api/profiles 201 31.7ms
+```
+
+Logs are written to stdout by default. Set `LOG_FILE` in `.env` to also write to a rotating file (not supported on Vercel).
+
+---
+
 ## API Version Header
 
 All `/api/*` endpoints require:
@@ -565,7 +606,8 @@ For **CLI usage**, obtain tokens via `POST /auth/cli/callback` and pass them in 
 
 ## Tech Stack
 
-- **Python 3.14+** — Flask, Flask-CORS, Flask-SQLAlchemy, Flask-JWT-Extended, pydantic-settings, pycountry
+- **Python 3.14+** — Flask, Flask-CORS, Flask-SQLAlchemy, Flask-JWT-Extended, Flask-Limiter, pydantic-settings, pycountry
 - **Database** — SQLite (local) / PostgreSQL (production)
 - **Auth** — GitHub OAuth (PKCE), JWT (access + refresh), Redis token blocklist
+- **Rate limiting** — Flask-Limiter with Redis storage (db `1`)
 - **External APIs** — Genderize.io, Agify.io, Nationalize.io

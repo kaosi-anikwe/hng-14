@@ -1,13 +1,14 @@
+import time
 import logging
 import urllib.parse
 
 import redis
 from flask_cors import CORS
-from flask import Flask, jsonify, request
-from flask_jwt_extended import JWTManager, decode_token
 from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from flask import Flask, g, jsonify, request
 from logging.handlers import RotatingFileHandler
+from flask_limiter.util import get_remote_address
+from flask_jwt_extended import JWTManager, decode_token
 
 from app.models import db, User
 from app.config import settings
@@ -128,6 +129,24 @@ def create_app() -> Flask:
     app = Flask(__name__)
 
     app.config.from_mapping(settings.model_dump())
+
+    request_logger = logging.getLogger("request")
+
+    @app.before_request
+    def _start_timer():
+        g._start_time = time.perf_counter()
+
+    @app.after_request
+    def _log_request(response):
+        elapsed_ms = (time.perf_counter() - g._start_time) * 1000
+        request_logger.info(
+            "%s %s %s %.1fms",
+            request.method,
+            request.path,
+            response.status_code,
+            elapsed_ms,
+        )
+        return response
 
     @app.errorhandler(429)
     def ratelimit_handler(e):
