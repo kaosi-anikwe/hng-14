@@ -10,3 +10,4 @@ requests
 pycountry
 python-dotenv
 pytest
+black
