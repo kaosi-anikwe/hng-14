@@ -1,5 +1,7 @@
 # Insighta Labs+ API
 
+[![CI](https://github.com/kaosi-anikwe/hng-14/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kaosi-anikwe/hng-14/actions/workflows/ci.yml)
+
 A Flask REST API backend for the Insighta Labs system. It classifies names by predicted gender, age, and nationality by aggregating data from [Genderize.io](https://genderize.io), [Agify.io](https://agify.io), and [Nationalize.io](https://nationalize.io). Profiles are persisted to a database — SQLite locally, or a PostgreSQL database in production.
 
 Authentication is handled via **GitHub OAuth** with PKCE. Access and refresh tokens are issued as JWTs stored in secure HTTP-only cookies (web) or returned as JSON (CLI). A **Redis** instance is used to maintain a token blocklist for logout and token rotation.
