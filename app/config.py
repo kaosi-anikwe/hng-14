@@ -22,6 +22,7 @@ class AppConfig(BaseSettings):
     JWT_COOKIE_SAMESITE: str = "None"
     JWT_COOKIE_CSRF_PROTECT: bool = False
     JWT_TOKEN_LOCATION: List[str] = ["cookies"]
+    JWT_ACCESS_COOKIE_NAME: str = "access_token"
 
     # Logging
     DEBUG: bool = True

@@ -64,7 +64,7 @@ jwt_redis_blocklist = redis.Redis(
 def _rate_limit_key() -> str:
     """Use JWT identity for authenticated requests, fall back to remote IP."""
     try:
-        token = request.cookies.get("access_token_cookie")
+        token = request.cookies.get("access_token")
         if token:
             data = decode_token(token, allow_expired=False)
             sub = data.get("sub")
