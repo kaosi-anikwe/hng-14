@@ -130,7 +130,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     app.config.from_mapping(settings.model_dump())
     if config_overrides:
         app.config.update(config_overrides)
-        
+
     # Set limiter storage URI from settings unless overridden (e.g. by tests)
     app.config.setdefault("RATELIMIT_STORAGE_URI", _redis_url(db_index=0))
 
