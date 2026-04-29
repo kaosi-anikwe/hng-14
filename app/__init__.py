@@ -95,8 +95,7 @@ def create_app() -> Flask:
     CORS(
         app,
         supports_credentials=True,
-        origins="*",
-        allow_headers=["Content-Type", "X-API-Version"],
+        origins=[settings.FRONTEND_URL, "http://127.0.0.1:5173"],
     )
 
     db.init_app(app)
