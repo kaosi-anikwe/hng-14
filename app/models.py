@@ -102,3 +102,15 @@ class User(Base):
         """Set last login to ``now`` and is active to ``True`` without committing"""
         self.is_active = True
         self.last_login_at = datetime.now(timezone.utc)
+
+    def to_json(self) -> dict[str, str | int | float]:
+        return {
+            "id": self.id,
+            "github_id": self.github_id,
+            "username": self.username,
+            "email": self.email,
+            "avatar_url": self.avatar_url,
+            "role": self.role.value,
+            "is_active": self.is_active,
+            "last_login_at": self.last_login_at.isoformat(),
+        }

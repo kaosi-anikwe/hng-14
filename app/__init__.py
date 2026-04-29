@@ -92,15 +92,22 @@ def create_app() -> Flask:
     app = Flask(__name__)
 
     app.config.from_mapping(settings.model_dump())
-    CORS(app, origins="*")
+    CORS(
+        app,
+        supports_credentials=True,
+        origins="*",
+        allow_headers=["Content-Type", "X-API-Version"],
+    )
 
     db.init_app(app)
     jwt.init_app(app)
 
     from app.routes.auth import routes as auth_bp
     from app.routes.profile import routes as profile_bp
+    from app.routes.user import routes as user_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(profile_bp)
+    app.register_blueprint(user_bp)
 
     return app

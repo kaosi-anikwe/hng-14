@@ -18,18 +18,13 @@ logger = logging.getLogger(__name__)
 routes = Blueprint("profiles", __name__, url_prefix="/api")
 
 
-@routes.before_request
-@version_required()
-def protect_blueprint():
-    pass
-
-
 @routes.get("/")
 def index():
     return jsonify({"message": "Hello"})
 
 
 @routes.get("/classify")
+@version_required()
 @jwt_required()
 def classify():
     try:
@@ -56,6 +51,7 @@ def classify():
 
 
 @routes.get("/profiles")
+@version_required()
 @jwt_required()
 def get_profiles():
     try:
@@ -105,7 +101,9 @@ def get_profiles():
 
         query = query.order_by(order_fn(sort_param))
 
-        pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
+        pagination = db.paginate(
+            query, page=page, per_page=min(50, per_page), error_out=False
+        )
 
         active_filters = {
             k: v for k, v in request.args.items() if k not in ("page", "limit")
@@ -170,6 +168,7 @@ def get_profiles():
 
 
 @routes.post("/profiles")
+@version_required()
 @admin_required()
 def create_profile():
     try:
@@ -242,6 +241,7 @@ def create_profile():
 
 
 @routes.get("/profiles/search")
+@version_required()
 @jwt_required()
 def search_profile():
     search_query = request.args.get("q", "").strip()
@@ -341,7 +341,9 @@ def search_profile():
 
     query = query.order_by(order_fn(sort_param))
 
-    pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
+    pagination = db.paginate(
+        query, page=page, per_page=min(50, per_page), error_out=False
+    )
 
     active_filters = {
         k: v for k, v in request.args.items() if k not in ("page", "limit")
@@ -399,6 +401,7 @@ def search_profile():
 
 
 @routes.get("/profiles/<string:id>")
+@version_required()
 @jwt_required()
 def profile(id: str):
     profile: Profile | None = db.session.get(Profile, id)
@@ -410,6 +413,7 @@ def profile(id: str):
 
 
 @routes.delete("/profiles/<string:id>")
+@version_required()
 @admin_required()
 def delete_profile(id: str):
     profile: Profile | None = db.session.get(Profile, id)
@@ -424,6 +428,7 @@ def delete_profile(id: str):
 
 
 @routes.get("/profiles/export")
+@version_required()
 @admin_required()
 def export_profiles():
     try:

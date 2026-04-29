@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import requests
 from requests import Request
 from sqlalchemy.exc import IntegrityError
-from flask import Blueprint, redirect, jsonify, session, request
+from flask import Blueprint, redirect, jsonify, session, request, make_response
 from flask_jwt_extended import (
     get_jwt,
     jwt_required,
@@ -143,15 +143,12 @@ def github_callback():
         # 6. Issue access and refresh token
         access_token = create_access_token(identity=user.id)
         refresh_token = create_refresh_token(identity=user.id)
-        response = jsonify(
-            {
-                "status": "success",
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-            }
-        )
+
+        response = make_response(redirect(f"{settings.FRONTEND_URL}/dashboard"))
+
         set_access_cookies(response, access_token)
         set_refresh_cookies(response, refresh_token)
+
         return response
     except Exception as e:
         db.session.rollback()
