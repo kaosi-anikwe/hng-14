@@ -9,3 +9,4 @@ redis
 requests
 pycountry
 python-dotenv
+pytest

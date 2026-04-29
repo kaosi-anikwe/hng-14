@@ -141,8 +141,13 @@ def github_callback():
                 )
 
         # 6. Issue access and refresh token
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        role_claims = {"role": user.role.value}
+        access_token = create_access_token(
+            identity=user.id, additional_claims=role_claims
+        )
+        refresh_token = create_refresh_token(
+            identity=user.id, additional_claims=role_claims
+        )
 
         response = make_response(redirect(f"{settings.FRONTEND_URL}/dashboard"))
 
@@ -247,8 +252,13 @@ def cli_callback():
                 )
 
         # 5. Issue access and refresh token
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        role_claims = {"role": user.role.value}
+        access_token = create_access_token(
+            identity=user.id, additional_claims=role_claims
+        )
+        refresh_token = create_refresh_token(
+            identity=user.id, additional_claims=role_claims
+        )
         return jsonify(
             {
                 "status": "success",
@@ -283,9 +293,16 @@ def refresh():
         if ttl > 0:
             jwt_redis_blocklist.setex(f"blacklist:{jti}", ttl, "revoked")
 
+        # Forward the role claim from the current refresh token
+        role_claims = {"role": jwt_payload.get("role")}
+
         # Generate brand new tokens
-        new_access_token = create_access_token(identity=identity)
-        new_refresh_token = create_refresh_token(identity=identity)
+        new_access_token = create_access_token(
+            identity=identity, additional_claims=role_claims
+        )
+        new_refresh_token = create_refresh_token(
+            identity=identity, additional_claims=role_claims
+        )
 
         return jsonify(
             {

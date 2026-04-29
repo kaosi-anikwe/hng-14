@@ -78,7 +78,6 @@ def _rate_limit_key() -> str:
 limiter = Limiter(
     key_func=_rate_limit_key,
     default_limits=["60 per minute"],
-    storage_uri=_redis_url(db_index=1),
 )
 # ---------------------
 
@@ -125,10 +124,14 @@ def revoked_token_callback(jwt_header, jwt_payload):
 # ---------------------
 
 
-def create_app() -> Flask:
+def create_app(config_overrides: dict | None = None) -> Flask:
     app = Flask(__name__)
 
     app.config.from_mapping(settings.model_dump())
+    if config_overrides:
+        app.config.update(config_overrides)
+    # Set limiter storage URI from settings unless overridden (e.g. by tests)
+    app.config.setdefault("RATELIMIT_STORAGE_URI", _redis_url(db_index=1))
 
     request_logger = logging.getLogger("request")
 

@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    env:
+      # Minimal env vars required to import the app config without a .env file
+      SECRET_KEY: ci-secret
+      JWT_SECRET_KEY: ci-jwt-secret
+      GITHUB_CLIENT_ID: ci-client-id
+      GITHUB_CLIENT_SECRET: ci-client-secret
+      REDIRECT_URI: http://localhost:5000/auth/github/callback
+      FRONTEND_URL: http://localhost:5173
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      REDIS_USERNAME: ""
+      REDIS_PASSWORD: ""
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint — black
+        run: black --check app tests
+
+      - name: Build check — app imports cleanly
+        run: python -c "from app import create_app; create_app()"
+
+      - name: Tests
+        run: pytest tests/ -v --tb=short
