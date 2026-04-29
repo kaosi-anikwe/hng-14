@@ -7,6 +7,7 @@ dependencies = [
     "flask-cors",
     "flask-sqlalchemy",
     "flask-jwt-extended",
+    "flask-limiter",
     "psycopg2-binary",
     "pydantic-settings",
     "redis",
