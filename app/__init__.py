@@ -96,6 +96,7 @@ def create_app() -> Flask:
         app,
         supports_credentials=True,
         origins=[settings.FRONTEND_URL, "http://127.0.0.1:5173"],
+        allow_headers=["Content-Type", "X-API-Version"],
     )
 
     db.init_app(app)
