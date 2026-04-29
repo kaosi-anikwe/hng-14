@@ -65,6 +65,10 @@ def _rate_limit_key() -> str:
     """Use JWT identity for authenticated requests, fall back to remote IP."""
     try:
         token = request.cookies.get("access_token")
+        if not token:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
         if token:
             data = decode_token(token, allow_expired=False)
             sub = data.get("sub")

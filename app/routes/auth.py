@@ -313,7 +313,7 @@ def cli_callback():
 
 
 @routes.post("/refresh")
-@jwt_required(refresh=True, locations=["json"])
+@jwt_required(refresh=True, locations=["json", "headers", "cookies"])
 def refresh():
     try:
         identity = get_jwt_identity()
