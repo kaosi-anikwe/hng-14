@@ -1,9 +1,12 @@
 import logging
+import urllib.parse
 
 import redis
 from flask_cors import CORS
-from flask import Flask, jsonify
-from flask_jwt_extended import JWTManager
+from flask import Flask, jsonify, request
+from flask_jwt_extended import JWTManager, decode_token
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from logging.handlers import RotatingFileHandler
 
 from app.models import db, User
@@ -34,6 +37,16 @@ if settings.LOG_FILE:
 # ---------------------
 
 
+# --- Redis URL helper ---
+def _redis_url(db_index: int = 0) -> str:
+    username = urllib.parse.quote(settings.REDIS_USERNAME or "", safe="")
+    password = urllib.parse.quote(settings.REDIS_PASSWORD or "", safe="")
+    return f"redis://{username}:{password}@{settings.REDIS_HOST}:{settings.REDIS_PORT}/{db_index}"
+
+
+# ---------------------
+
+
 # --- Redis client ---
 jwt_redis_blocklist = redis.Redis(
     host=settings.REDIS_HOST,
@@ -42,6 +55,29 @@ jwt_redis_blocklist = redis.Redis(
     password=settings.REDIS_PASSWORD,
     db=0,
     decode_responses=True,
+)
+# ---------------------
+
+
+# --- Rate limiter ---
+def _rate_limit_key() -> str:
+    """Use JWT identity for authenticated requests, fall back to remote IP."""
+    try:
+        token = request.cookies.get("access_token_cookie")
+        if token:
+            data = decode_token(token, allow_expired=False)
+            sub = data.get("sub")
+            if sub:
+                return f"user:{sub}"
+    except Exception:
+        pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    default_limits=["60 per minute"],
+    storage_uri=_redis_url(db_index=1),
 )
 # ---------------------
 
@@ -92,6 +128,16 @@ def create_app() -> Flask:
     app = Flask(__name__)
 
     app.config.from_mapping(settings.model_dump())
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return (
+            jsonify(
+                {"status": "error", "message": "Too many requests. Please slow down."}
+            ),
+            429,
+        )
+
     CORS(
         app,
         supports_credentials=True,
@@ -101,10 +147,14 @@ def create_app() -> Flask:
 
     db.init_app(app)
     jwt.init_app(app)
+    limiter.init_app(app)
 
     from app.routes.auth import routes as auth_bp
     from app.routes.profile import routes as profile_bp
     from app.routes.user import routes as user_bp
+
+    # Auth endpoints are unauthenticated — key by IP, stricter limit
+    limiter.limit("10 per minute", key_func=get_remote_address)(auth_bp)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(profile_bp)
