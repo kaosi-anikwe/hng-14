@@ -20,9 +20,9 @@ from flask_jwt_extended import (
 )
 
 from app.config import settings
-from app.models import db, User
 from app import jwt_redis_blocklist
 from app.utils import generate_pkce
+from app.models import db, User, Role
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("auth", __name__, url_prefix="/auth")
@@ -120,11 +120,15 @@ def github_callback():
             db.session.commit()
             user = existing_user
         else:
+            admin_exists = (
+                db.session.query(User).filter(User.role == Role.ADMIN).first() != None
+            )
             new_user: User = User(
                 github_id=github_id,
                 username=username,
                 email=email,
                 avatar_url=avatar_url,
+                role=Role.ANALYST if admin_exists else Role.ADMIN,
             )
             new_user.login_now()
             db.session.add(new_user)
