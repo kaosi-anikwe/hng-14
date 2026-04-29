@@ -152,6 +152,12 @@ def create_app(config_overrides: dict | None = None) -> Flask:
         )
         return response
 
+    @app.get("/")
+    @app.get("/health")
+    @limiter.exempt
+    def health():
+        return jsonify({"status": "ok"}), 200
+
     @app.errorhandler(429)
     def ratelimit_handler(e):
         return (
