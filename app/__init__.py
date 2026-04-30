@@ -186,9 +186,6 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from app.routes.profile import routes as profile_bp
     from app.routes.user import routes as user_bp
 
-    # Auth endpoints are unauthenticated — key by IP, stricter limit
-    limiter.limit("10 per minute", key_func=get_remote_address)(auth_bp)
-
     app.register_blueprint(auth_bp)
     app.register_blueprint(profile_bp)
     app.register_blueprint(user_bp)

@@ -18,11 +18,6 @@ logger = logging.getLogger(__name__)
 routes = Blueprint("profiles", __name__, url_prefix="/api")
 
 
-@routes.get("/")
-def index():
-    return jsonify({"message": "Hello"})
-
-
 @routes.get("/classify")
 @version_required()
 @jwt_required()
