@@ -11,6 +11,8 @@ dependencies = [
     "psycopg2-binary",
     "pydantic-settings",
     "redis",
+    "flask-compress",
+    "orjson",
     "requests",
     "pycountry",
     "python-dotenv",
