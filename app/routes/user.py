@@ -18,11 +18,11 @@ def me():
     try:
         user: User | None = get_current_user()
         if not user:
-            raise Exception("user does not exist")
+            return jsonify({"status": "error", "message": "user does not exist"}), 404
         return jsonify({"status": "success", "user": user.to_json()})
     except Exception as e:
         logger.error(f"Failed to load user: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)})
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @routes.get("/dashboard")

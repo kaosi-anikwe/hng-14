@@ -7,6 +7,7 @@ import requests
 from requests import Request
 from sqlalchemy.exc import IntegrityError
 from flask import Blueprint, redirect, jsonify, session, request, make_response
+from flask_limiter.util import get_remote_address
 from flask_jwt_extended import (
     get_jwt,
     jwt_required,
@@ -20,7 +21,7 @@ from flask_jwt_extended import (
 )
 
 from app.config import settings
-from app import jwt_redis_blocklist
+from app import jwt_redis_blocklist, limiter
 from app.utils import generate_pkce
 from app.models import db, User, Role
 
@@ -313,7 +314,8 @@ def cli_callback():
 
 
 @routes.post("/refresh")
-@jwt_required(refresh=True, locations=["json"])
+@limiter.limit("20 per minute", key_func=get_remote_address)
+@jwt_required(refresh=True, locations=["json", "headers", "cookies"])
 def refresh():
     try:
         identity = get_jwt_identity()
@@ -356,6 +358,7 @@ def refresh():
 
 
 @routes.post("/logout")
+@limiter.limit("20 per minute", key_func=get_remote_address)
 @jwt_required(verify_type=False)
 def logout():
     try:
