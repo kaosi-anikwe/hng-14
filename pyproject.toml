@@ -13,6 +13,7 @@ dependencies = [
     "redis",
     "flask-compress",
     "orjson",
+    "polars",
     "requests",
     "pycountry",
     "python-dotenv",
