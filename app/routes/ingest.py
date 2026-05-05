@@ -8,6 +8,7 @@ from flask_jwt_extended import jwt_required
 
 from app.utils import version_required
 from app.models import db, Profile
+from app.cache import cache_invalidate_profiles
 
 logger = logging.getLogger(__name__)
 routes = Blueprint("ingest", __name__, url_prefix="/api")
@@ -167,4 +168,9 @@ def upload_csv():
         stats["skipped"],
         error_counts,
     )
+
+    # Invalidate cached list/search pages — the profile table has changed.
+    if stats["inserted"] > 0:
+        cache_invalidate_profiles()
+
     return jsonify({"status": "success", **stats, "reasons": {**error_counts}})

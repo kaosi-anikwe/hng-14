@@ -4,6 +4,7 @@ import urllib.parse
 
 import redis
 from flask_cors import CORS
+from flask_compress import Compress
 from flask_limiter import Limiter
 from flask import Flask, g, jsonify, request
 from logging.handlers import RotatingFileHandler
@@ -135,6 +136,18 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     if config_overrides:
         app.config.update(config_overrides)
 
+    # pool_pre_ping: issues a cheap SELECT 1 before each checkout to detect
+    #   stale connections (avoids 500s after network blips or DB restarts).
+    # pool_recycle: recycle connections older than 30 min to beat PostgreSQL's
+    #   default tcp_keepalives_idle / idle session timeout.
+    app.config.setdefault(
+        "SQLALCHEMY_ENGINE_OPTIONS",
+        {
+            "pool_pre_ping": True,
+            "pool_recycle": 1800,
+        },
+    )
+
     # Set limiter storage URI from settings unless overridden (e.g. by tests)
     app.config.setdefault("RATELIMIT_STORAGE_URI", _redis_url(db_index=0))
 
@@ -181,6 +194,7 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     db.init_app(app)
     jwt.init_app(app)
     limiter.init_app(app)
+    Compress(app)
 
     from app.routes.auth import routes as auth_bp
     from app.routes.profile import routes as profile_bp

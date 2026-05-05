@@ -5,7 +5,17 @@ from datetime import datetime, timezone
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, Float, String, Text, Enum, DateTime, Boolean
+from sqlalchemy import (
+    Integer,
+    Float,
+    String,
+    Text,
+    Enum,
+    DateTime,
+    Boolean,
+    Index,
+    column as sa_col,
+)
 
 
 def _uuid7_hex() -> str:
@@ -51,6 +61,27 @@ class Profile(Base):
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        # gender + age: covers (gender) and (gender, age range) queries
+        Index("ix_profile_gender_age", "gender", "age"),
+        # gender + lower(country_name): "female Nigerians" style NLP queries
+        # sa_col() creates a column clause so func.lower() generates lower(country_name)
+        # not lower('country_name') (the literal string) which was the old bug.
+        Index(
+            "ix_profile_gender_country_name",
+            "gender",
+            db.func.lower(sa_col("country_name")),
+        ),
+        # lower(country_name): country-only NLP queries
+        Index("ix_profile_country_name_lower", db.func.lower(sa_col("country_name"))),
+        # country_id: used as an exact-match filter in get_profiles
+        Index("ix_profile_country_id", "country_id"),
+        # age_group: used as an exact-match filter in get_profiles
+        Index("ix_profile_age_group", "age_group"),
+        # created_at: supports sort-by-date queries
+        Index("ix_profile_created_at", "created_at"),
     )
 
     def to_json(self) -> dict[str, str | int | float]:
