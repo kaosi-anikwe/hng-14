@@ -185,9 +185,11 @@ def create_app(config_overrides: dict | None = None) -> Flask:
     from app.routes.auth import routes as auth_bp
     from app.routes.profile import routes as profile_bp
     from app.routes.user import routes as user_bp
+    from app.routes.ingest import routes as ingest_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(profile_bp)
     app.register_blueprint(user_bp)
+    app.register_blueprint(ingest_bp)
 
     return app
