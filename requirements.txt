@@ -3,11 +3,14 @@ flask-cors
 flask-sqlalchemy
 flask-jwt-extended
 flask-limiter
+flask-compress
 psycopg2-binary
 pydantic-settings
 redis
+orjson
 requests
 pycountry
 python-dotenv
 pytest
 black
+polars
